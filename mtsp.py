@@ -51,6 +51,12 @@ class MSTP(Environment):
     def state(self):
         return self.graph
 
+    def possible_actions(self):
+        pass
+
+    def make_move(self, state, action):
+        pass
+
     @staticmethod
     def _from_file(file_path):
         with open(file_path, 'r') as f:

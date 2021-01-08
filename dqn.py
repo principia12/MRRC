@@ -57,8 +57,8 @@ class ReplayMemory:
         self.memory[self.position] = Transition(*args)
         self.position = (self.position + 1) % self.capacity
 
-    def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
+    def sample(self):
+        return random.sample(self.memory, self.batch_size)
 
     def __len__(self):
         return len(self.memory)

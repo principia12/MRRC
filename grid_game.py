@@ -6,37 +6,18 @@ from torch.autograd import Variable
 
 from environ_oracle_interface import Environment
 
-class GridWorld(Environment):
-    STATE_INITIALIZER_DICT = {\
-        0 : init_grid,
-        1 : init_grid_player,
-        2 : init_grid_rand, }
-
-    def __init__(self, game_type = 0):
-        self._state = GridWorld.STATE_INITIALIZER_DICT(game_type)
-
-    def state(self):
-        return Variable(torch.from_numpy(self.state)).view(1, -1)
-
-    def __str__(self):
-        return pformat(display_grid(self._state))
-
-    def possible_actions(self):
-        return list(range(4))
-
-    def make_move(self, action):
-        self._state = make_move(self._state, action)
-
-        return self.state()
-
-    def reward(self, before_state, cur_state):
-        return get_reward(cur_state)
+try: # when programming in company
+    from devtools.debugger import debug_shell
+except ImportError:
+    from code import interact
+    debug_shell = lambda : interact(local = locals())
 
 def rand_pair(s,e):
     return np.random.randint(s,e), np.random.randint(s,e)
 
 #finds an array in the "depth" dimension of the grid
 def find_loc(state, obj):
+
     for i in range(0,4):
         for j in range(0,4):
             if (state[i,j] == obj).all():
@@ -107,11 +88,24 @@ def make_move(state, action):
     wall = find_loc(state, np.array([0,0,1,0]))
     goal = find_loc(state, np.array([1,0,0,0]))
     pit = find_loc(state, np.array([0,1,0,0]))
+    # print(display_grid(state))
     state = np.zeros((4,4,4))
 
     actions = [[-1,0],[1,0],[0,-1],[0,1]]
     #e.g. up => (player row - 1, player column + 0)
-    new_loc = (player_loc[0] + actions[action][0], player_loc[1] + actions[action][1])
+    # up: 0, down : 1, left: 2 right: 3
+
+    new_loc = [player_loc[0] + actions[action][0], player_loc[1] + actions[action][1]]
+
+
+    new_loc[0] = max(0, new_loc[0])
+    new_loc[1] = max(0, new_loc[1])
+    new_loc[0] = min(3, new_loc[0])
+    new_loc[1] = min(3, new_loc[1])
+
+    new_loc = tuple(new_loc)
+
+    # print(player_loc, new_loc, action)
     if (new_loc != wall):
         if ((np.array(new_loc) <= (3,3)).all() and (np.array(new_loc) >= (0,0)).all()):
             state[new_loc][3] = 1
@@ -135,9 +129,9 @@ def get_loc(state, level):
                 return i,j
 
 def get_reward(state):
-    player_loc = getLoc(state, 3)
-    pit = getLoc(state, 1)
-    goal = getLoc(state, 0)
+    player_loc = get_loc(state, 3)
+    pit = get_loc(state, 1)
+    goal = get_loc(state, 0)
     if (player_loc == pit):
         return -10
     elif (player_loc == goal):
@@ -145,7 +139,7 @@ def get_reward(state):
     else:
         return -1
 
-def disp_grid(state):
+def display_grid(state):
     grid = np.zeros((4,4), dtype= str)
     player_loc = find_loc(state, np.array([0,0,0,1]))
     wall = find_loc(state, np.array([0,0,1,0]))
@@ -165,3 +159,31 @@ def disp_grid(state):
         grid[pit] = '-' #pit
 
     return grid
+
+
+class GridWorld(Environment):
+    STATE_INITIALIZER_DICT = {\
+        0 : init_grid,
+        1 : init_grid_player,
+        2 : init_grid_rand, }
+
+    def __init__(self, game_type = 0):
+        self._state = GridWorld.STATE_INITIALIZER_DICT[game_type]()
+
+    def state(self):
+        return Variable(torch.from_numpy(self._state)).view(1, -1)
+
+    def __str__(self):
+        return pformat(display_grid(self._state))
+
+    def possible_actions(self):
+        return list(range(4))
+
+    def make_move(self, action):
+        self._state = make_move(self._state, action)
+        # print(self)
+        # print(action)
+        return self.state()
+
+    def reward(self, before_state, cur_state):
+        return get_reward(cur_state.view(4,4,4))

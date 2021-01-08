@@ -5,6 +5,8 @@ from graph import Edge, Graph
 from pprint import pformat, pprint
 from math import sqrt
 
+from struct2vec import
+
 class Robot:
     def __init__(self, robot_id, location):
         self.robot_id = robot_id

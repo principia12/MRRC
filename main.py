@@ -1,47 +1,33 @@
 import dqn
+import random
 
 from dqn import ReplayMemory, Transition, Q_learning
-from torch.autograd import Variable
 from grid_game import GridWorld
+from torch.autograd import Variable
+from torch.nn import functional as F
+
+
+import numpy as np
 import torch.optim as optim
 import torch
 
 ## Include the replay experience
 
-epochs = 1000
-gamma = 0.9 #since it may take several moves to goal, making gamma high
-epsilon = 1
-model = Q_learning(64, [150,150], 4, hidden_unit)
-optimizer = optim.RMSprop(model.parameters(), lr = 1e-2)
+# epochs = 1000
+# gamma = 0.9 #since it may take several moves to goal, making gamma high
+# epsilon = 1
+# model = Q_learning(64, [150,150], 4, hidden_unit)
+# optimizer = optim.RMSprop(model.parameters(), lr = 1e-2)
 # optimizer = optim.SGD(model.parameters(), lr = 0.1, momentum = 0)
-criterion = torch.nn.MSELoss()
-buffer = 80
-batch_size = 40
-memory = ReplayMemory(buffer)
+# criterion = torch.nn.MSELoss()
+# buffer = 80
+# batch_size = 40
+# memory = ReplayMemory(buffer)
 
 class TrainConfig:
     def __init__(self, kargs):
         for k, v in kargs.items():
             exec(f'setattr(self, {k}, v)')
-
-model_config = {\
-    'in_channels' : 64,
-    'hidden_layers' : [150, 150],
-    'out_channels' : 4,
-    'unit' : dqn.hidden_unit,
-    'activation' : F.relu, }
-
-memory_config = {\
-    'buffer' : 80,
-    'batch_size' : 40, }
-
-grid_train_config = {\
-    epochs = 1000,
-    gamma = 0.9,
-    epsilon = 1,
-    optimizer = optim.RMSprop,
-    lr = 1e-2,
-    criterion = torch.nn.MSELoss(),
 
 def training_dqn(model,
                model_config,
@@ -49,12 +35,23 @@ def training_dqn(model,
                environ_config,
                memory,
                memory_config,
+               optimizer,
+               optimizer_config,
+               loss,
+               loss_config,
                train_config):
 
     model = model(**model_config)
     memory = memory(**memory_config)
+    optimizer = optimizer(model.parameters(), **optimizer_config)
 
-    for i in range(train_config.epochs):
+    epsilon = train_config['epsilon']
+    gamma = train_config['gamma']
+    criterion = train_config['criterion']
+
+    epochs = train_config['epochs']
+
+    for i in range(epochs):
         # state = initGridPlayer()
         ev = environ(**environ_config)
         state = ev.state()
@@ -74,6 +71,7 @@ def training_dqn(model,
 
             #Take action, observe new state S'
             new_state = ev.make_move(action)
+            # print(state, new_state)
             step += 1
 
             #Observe reward
@@ -81,14 +79,14 @@ def training_dqn(model,
 
             memory.push(state.data, action, new_state.data, reward)
 
-            if (len(memory) < buffer): #if buffer not filled, add to it
+            if (len(memory) < memory.capacity): #if buffer not filled, add to it
                 state = new_state
                 if reward != -1: #if reached terminal state, update game status
                     break
                 else:
                     continue
 
-            transitions = memory.sample(BATCH_SIZE)
+            transitions = memory.sample()
 
             batch = Transition(*zip(*transitions))
             state_batch = Variable(torch.cat(batch.state))
@@ -107,55 +105,86 @@ def training_dqn(model,
             with torch.no_grad():
                 newQ = model(new_state_batch)
             maxQ = newQ.max(1)[0]
-            # if reward == -1: #non-terminal state
-                # update = (reward + (gamma * maxQ))
-            # else: #terminal state
-                # update = reward + 0*maxQ
-            # y = reward_batch + (reward_batch == -1).float() * gamma *maxQ
+
             y = reward_batch
             y[non_final_mask] += gamma * maxQ[non_final_mask]
             y = y.view(-1,1)
-            print("Game #: %s" % (i,), end='\r')
+
             loss = criterion(state_action_values, y)
+
             # Optimize the model
             optimizer.zero_grad()
             loss.backward()
             for p in model.parameters():
                 p.grad.data.clamp_(-1, 1)
             optimizer.step()
+
+            print(f'Game #: {i}, loss : {loss}')
+
             state = new_state
             if reward != -1:
-                status = 0
+                game_status = 0
             if step >20:
                 break
+
         if epsilon > 0.1:
             epsilon -= (1/epochs)
 
+    return model
+
+grid_optimizer_config = {'lr' : 1e-2}
+
+grid_model_config = {\
+    'in_channels' : 64,
+    'hidden_layers' : [150, 150],
+    'out_channels' : 4,
+    'unit' : dqn.hidden_unit,
+    'activation' : F.relu, }
+
+grid_memory_config = {\
+    'capacity' : 80,
+    'batch_size' : 40, }
+
+grid_train_config = {\
+    'epochs' : 1000,
+    'gamma' : 0.9,
+    'epsilon' : 1,
+    'criterion' : torch.nn.MSELoss(),}
+
+grid_environ_config = {\
+    'game_type' : 1}
 
 
-## Here is the test of AI
-def testAlgo(init=0):
+grid_solver = training_dqn(model = Q_learning,
+                model_config = grid_model_config,
+                environ = GridWorld,
+                environ_config = grid_environ_config,
+                memory = ReplayMemory,
+                memory_config = grid_memory_config,
+                optimizer = optim.RMSprop,
+                optimizer_config = grid_optimizer_config,
+                loss = torch.nn.MSELoss(),
+                loss_config = {},
+                train_config = grid_train_config)
+
+def test_model(model, environ, environ_config):
     i = 0
-    if init==0:
-        state = initGrid()
-    elif init==1:
-        state = initGridPlayer()
-    elif init==2:
-        state = initGridRand()
+    ev = environ(**environ_config)
+    state = ev.state()
 
     print("Initial State:")
-    print(dispGrid(state))
+    print(ev)
     status = 1
     #while game still in progress
     while(status == 1):
-        v_state = Variable(torch.from_numpy(state))
-        qval = model(v_state.view(64))
+        qval = model(state)
         print(qval)
         action = np.argmax(qval.data) #take action with highest Q-value
         print('Move #: %s; Taking action: %s' % (i, action))
-        state = makeMove(state, action)
-        print(dispGrid(state))
-        reward = getReward(state)
+        state = ev.make_move(action)
+        print(ev)
+        reward = ev.reward(None, state)
+
         if reward != -1:
             status = 0
             print("Reward: %s" % (reward,))
@@ -164,10 +193,7 @@ def testAlgo(init=0):
             print("Game lost; too many moves.")
             break
 
-training_dqn(model = Q_learning(64, [150,150], 4, hidden_unit),
-    )
+test_model(grid_solver, environ = GridWorld, environ_config = grid_environ_config)
 
-
-testAlgo(init=1)
 from code import interact
 interact(local = locals())

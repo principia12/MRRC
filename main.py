@@ -67,7 +67,7 @@ def training_dqn(model,
             if (np.random.random() < epsilon): #choose random action
                 action = random.choice(ev.possible_actions())
             else: #choose best action from Q(s,a) values
-                action = np.argmax(Q.data)
+                action = np.argmax(Q.data) # this part needs refactoring
 
             #Take action, observe new state S'
             new_state = ev.make_move(action)
@@ -146,7 +146,7 @@ grid_memory_config = {\
     'batch_size' : 40, }
 
 grid_train_config = {\
-    'epochs' : 1000,
+    'epochs' : 100,
     'gamma' : 0.9,
     'epsilon' : 1,
     'criterion' : torch.nn.MSELoss(),}

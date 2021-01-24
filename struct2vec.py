@@ -7,7 +7,9 @@ class Struct2vec:
         N = self.config.N
 
         self.W1 = torch.rand(1, N)
-        self.W2 =
+        self.W2 = torch.rand(N, 3)
+        self.W3 = torch.rand()
+        self.W4 = torch.rand()
 
     def state(self, input_func):
         G = []
@@ -17,8 +19,8 @@ class Struct2vec:
         graph = mtsp_instance.graph
         depot = mtsp_instance.depot
 
-        W1 = torch.rand(1, N)
-        W2 = torch.rand(N, 3)
+        # W1 = torch.rand(1, N)
+        # W2 = torch.rand(N, 3)
 
         for i, v in enumerate(graph.V):
             G.append([])

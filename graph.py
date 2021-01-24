@@ -2,6 +2,14 @@ from collections import defaultdict
 
 class Graph:
     def __init__(self, V, E):
+        for v in V:
+            assert isinstance(v, int)
+
+        for e in E:
+            assert isinstance(e, Edge)
+            assert e.from_node in V
+            assert e.to_node in V
+
         self.V = V
         self.E = E
 
@@ -15,6 +23,7 @@ class Graph:
     @staticmethod
     def from_nodes(V, edge_generator):
         E = []
+
         for v in V:
             for u in V:
                 if u != v:

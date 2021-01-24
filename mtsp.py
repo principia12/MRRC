@@ -11,6 +11,26 @@ from struct2vec import
 
 class Robot:
     def __init__(self, robot_id, initial_position):
+        """Wrapper class for robot.
+
+        Attributes:
+            robot_id: int
+                id of robot.
+            location_history: listof int
+                Recording previous positions of robot. The last element of the location_history should be the current position of the robot in any time.
+            is_available: bool
+                If robot is not assigned to any of the tasks, is_available is True.
+                Else, it must be False.
+            assigned_city: None or int
+                If None,
+                    1) The robot is in its initial state
+                    2) The robot have no more task to be assigned.
+                If assigned_city is None, is_available must be True.
+
+                When robot have arrived to the task, its next location shall be determined at the moment.
+            remaining_distance: float
+                Remaining distance to the assigned_city.
+        """
         self.robot_id = robot_id
         self.location_history = [initial_position]
         self.is_available = True
@@ -69,15 +89,33 @@ class MTSP(Environment):
         self.config = DummyCls(**config)
 
     @staticmethod
-    def _distance_from_robot(self):
-        pass
+    def _distance_from_robot(self, v):
+        assert v in self.graph.V
+
+        dists = []
+
+        for r in self.robots:
+            if r.assigned_city is not None:
+                dist.append(self.graph[r.assigned_city][v] + r.remaining_distance)
+            else:
+                if len(r.location_history) == 1: # in the depot
+                    dists.append(self.graph[self.depot][v])
+                else: # when there are
+                    tmp_dist = []
+                    for r in self.robots:
+                        if r.assigned_city == v:
+                            tmp_dist.append(r.remaining_cities)
 
     @staticmethod
-    def _distance_from_depot(self):
-        pass
+    def _distance_from_depot(self, v):
+        return self.graph[self.depot][v]
 
     def state(self):
-        pass
+        x1 = struct2vec(self, MTSP._distance_from_robot)
+        x2 = struct2vec(self, MTSP._distance_from_depot)
+
+        final_mu = struct2vec(self, lambda v: torch.cat(x1[v], x2[v]))
+
 
     def possible_actions(self):
         if len(self.available_robots) > 2:

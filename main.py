@@ -11,23 +11,7 @@ import numpy as np
 import torch.optim as optim
 import torch
 
-## Include the replay experience
-
-# epochs = 1000
-# gamma = 0.9 #since it may take several moves to goal, making gamma high
-# epsilon = 1
-# model = Q_learning(64, [150,150], 4, hidden_unit)
-# optimizer = optim.RMSprop(model.parameters(), lr = 1e-2)
-# optimizer = optim.SGD(model.parameters(), lr = 0.1, momentum = 0)
-# criterion = torch.nn.MSELoss()
-# buffer = 80
-# batch_size = 40
-# memory = ReplayMemory(buffer)
-
-class TrainConfig:
-    def __init__(self, kargs):
-        for k, v in kargs.items():
-            exec(f'setattr(self, {k}, v)')
+# Include the replay experience
 
 def training_dqn(model,
                model_config,
@@ -132,29 +116,6 @@ def training_dqn(model,
 
     return model
 
-grid_optimizer_config = {'lr' : 1e-2}
-
-grid_model_config = {\
-    'in_channels' : 64,
-    'hidden_layers' : [150, 150],
-    'out_channels' : 4,
-    'unit' : dqn.hidden_unit,
-    'activation' : F.relu, }
-
-grid_memory_config = {\
-    'capacity' : 80,
-    'batch_size' : 40, }
-
-grid_train_config = {\
-    'epochs' : 1000,
-    'gamma' : 0.9,
-    'epsilon' : 1,
-    'criterion' : torch.nn.MSELoss(),}
-
-grid_environ_config = {\
-    'game_type' : 1}
-
-
 grid_solver = training_dqn(model = Q_learning,
                 model_config = grid_model_config,
                 environ = GridWorld,
@@ -192,6 +153,30 @@ def test_model(model, environ, environ_config):
         if (i > 10):
             print("Game lost; too many moves.")
             break
+
+
+grid_optimizer_config = {'lr' : 1e-2}
+
+grid_model_config = {\
+    'in_channels' : 64,
+    'hidden_layers' : [150, 150],
+    'out_channels' : 4,
+    'unit' : dqn.hidden_unit,
+    'activation' : F.relu, }
+
+grid_memory_config = {\
+    'capacity' : 80,
+    'batch_size' : 40, }
+
+grid_train_config = {\
+    'epochs' : 1000,
+    'gamma' : 0.9,
+    'epsilon' : 1,
+    'criterion' : torch.nn.MSELoss(),}
+
+grid_environ_config = {\
+    'game_type' : 1}
+
 
 test_model(grid_solver, environ = GridWorld, environ_config = grid_environ_config)
 

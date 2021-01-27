@@ -51,7 +51,7 @@ def training_dqn(model,
             if (np.random.random() < epsilon): #choose random action
                 action = random.choice(ev.possible_actions())
             else: #choose best action from Q(s,a) values
-                action = np.argmax(Q.data)
+                action = np.argmax(Q.data) # this part needs refactoring
 
             #Take action, observe new state S'
             new_state = ev.make_move(action)
@@ -115,6 +115,29 @@ def training_dqn(model,
             epsilon -= (1/epochs)
 
     return model
+
+grid_optimizer_config = {'lr' : 1e-2}
+
+grid_model_config = {\
+    'in_channels' : 64,
+    'hidden_layers' : [150, 150],
+    'out_channels' : 4,
+    'unit' : dqn.hidden_unit,
+    'activation' : F.relu, }
+
+grid_memory_config = {\
+    'capacity' : 80,
+    'batch_size' : 40, }
+
+grid_train_config = {\
+    'epochs' : 100,
+    'gamma' : 0.9,
+    'epsilon' : 1,
+    'criterion' : torch.nn.MSELoss(),}
+
+grid_environ_config = {\
+    'game_type' : 1}
+
 
 grid_solver = training_dqn(model = Q_learning,
                 model_config = grid_model_config,

@@ -1,9 +1,10 @@
 from collections import defaultdict
+from pprint import pprint
 
 class Graph:
     def __init__(self, V, E):
         for v in V:
-            assert isinstance(v, int)
+            assert isinstance(v, int), v
 
         for e in E:
             assert isinstance(e, Edge)
@@ -20,6 +21,11 @@ class Graph:
 
         self.adj_list = adj
 
+        for v in V:
+            assert v in adj
+            for u in V:
+                assert u in adj[v], (type(v), type(u), v, u)
+
     @staticmethod
     def from_nodes(V, edge_generator):
         E = []
@@ -35,6 +41,7 @@ class Graph:
         return self.adj_list[from_node][to_node].weight
 
     def __getitem__(self, elem):
+        # pprint(elem)
         return self.adj_list[elem]
 
 class Edge:

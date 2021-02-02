@@ -7,7 +7,7 @@ from collections import namedtuple
 from pprint import pformat, pprint
 from math import sqrt
 
-from struct2vec import
+from struct2vec import Struct2vec
 
 class Robot:
     def __init__(self, robot_id, initial_position):
@@ -61,7 +61,7 @@ class Coordinate:
 
 class City:
     def __init__(self, city_id, x, y):
-        self.city_id = city_id
+        self.city_id = int(city_id)
         self.x = x
         self.y = y
         self.loc = Coordinate(x, y)
@@ -75,47 +75,50 @@ class MTSP(Environment):
     Action = namedtuple('action', ['robot', 'src', 'dest'])
 
     def __init__(self, cities, depot, robots, **config ):
-        assert depot in graph.V
 
-        self.graph = Graph.from_nodes(cities,
-                        lambda x, y : Edge(x, y, x.loc - y.loc))
+        V = []
+        E = []
+
+        for c in cities:
+            V.append(c.city_id)
+            for d in cities:
+                E.append(Edge(c.city_id, d.city_id, c.loc - d.loc))
+
+        self.graph = Graph(V, E)
         self.depot = depot
+        assert depot in self.graph.V, (depot, self.graph.V)
 
-        self.remaining_cities = [v for v in graph.V if v != depot]
-        self.available_robots = self.robots
+        self.remaining_cities = [v for v in self.graph.V if v != depot]
+        self.available_robots = robots
         self.epoch = 0
         self.robots = robots
 
         self.config = DummyCls(**config)
 
-    @staticmethod
-    def _distance_from_robot(self, v):
-        assert v in self.graph.V
+    def distance_from_robot(self):
+        res = {}
 
-        dists = []
+        for v in self.graph.V:
+            dists = []
+            for r in self.robots:
+                if r.assigned_city is not None:
+                    dist.append(self.graph[r.assigned_city][v] + r.remaining_distance)
+                else:
+                    # if len(r.location_history) == 1: # in the depot
+                        # dists.append(self.graph[self.depot][v])
+                    # else: # when there are
+                        # tmp_dist = []
+                        # for r in self.robots:
+                            # if r.assigned_city == v:
+                                # tmp_dist.append(r.remaining_cities)
+                        # dists.append(min(tmp_dist))
+                    dists.append(0)
+            res[v] = min(dists)
 
-        for r in self.robots:
-            if r.assigned_city is not None:
-                dist.append(self.graph[r.assigned_city][v] + r.remaining_distance)
-            else:
-                if len(r.location_history) == 1: # in the depot
-                    dists.append(self.graph[self.depot][v])
-                else: # when there are
-                    tmp_dist = []
-                    for r in self.robots:
-                        if r.assigned_city == v:
-                            tmp_dist.append(r.remaining_cities)
+        return res
 
-    @staticmethod
-    def _distance_from_depot(self, v):
-        return self.graph[self.depot][v]
-
-    def state(self):
-        x1 = struct2vec(self, MTSP._distance_from_robot)
-        x2 = struct2vec(self, MTSP._distance_from_depot)
-
-        final_mu = struct2vec(self, lambda v: torch.cat(x1[v], x2[v]))
-
+    def distance_from_depot(self):
+        return self.graph[self.depot]
 
     def possible_actions(self):
         if len(self.available_robots) > 2:
@@ -129,36 +132,47 @@ class MTSP(Environment):
     def auction(self):
         return []
 
-    def make_move(self, action):
-        robot, src, dest = action
-        assert src == robot.location_history[-1]
-        assert robot.is_available
-        assert dest in self.remaining_cities
+    def state(self):
+        pass
 
-        #
-        robot.location_history.append(dest)
-        robot.is_available = False
-        robot.assigned_city = dest
-        robot.remaining_distance = self.graph[src][dest]
+    def make_move(self, actions):
+        for action in actions:
+            robot, dest = action
+            assert robot.is_available
+            assert dest in self.remaining_cities
 
-        self.remaining_cities.remove(dest)
+            #
+            src = robot.location_history[-1]
+            robot.location_history.append(dest)
+            robot.is_available = False
+            robot.assigned_city = dest
+            try:
+                robot.remaining_distance = self.graph[src][dest]
+            except KeyError:
+                # pprint(list(self.graph.adj_list.keys()))
+                from code import interact
+                assert False, interact(local = locals())
 
-        min_distance, next_arriving_robot = min([r.remaining_distance, r \
-                for r in self.robots if r.remaining_distance > 0])
+            self.remaining_cities.remove(dest)
+
+        min_distance, next_arriving_robot = min([(r.remaining_distance, r) \
+                for r in self.robots if r.remaining_distance > 0], key = lambda x:x[0])
 
         for r in self.robots:
             if r.remaining_distance > 0:
                 r.remaining_distance -= min_distance
 
+        next_robots = []
 
+        for r in self.robots:
+            if r.remaining_distance == 0:
+                next_robots.append(r)
+                r.is_available = True
 
-        return self.state()
-
-
-
+        return min_distance, next_robots
 
     @staticmethod
-    def _from_file(file_path):
+    def _from_file(file_path, **config):
         with open(file_path, 'r') as f:
             locations = []
             for line in f.readlines():
@@ -170,11 +184,49 @@ class MTSP(Environment):
         for i in [2,3,5,7]:
             instances.append(MTSP(\
                 locations,
-                locations[0],
-                Robot.generate_robots(i, locations[0])))
+                locations[0].city_id,
+                Robot.generate_robots(i, locations[0].city_id),
+                **config))
 
         return instances
 
 if __name__ == '__main__':
-    instances = MTSP._from_file(os.path.join('data', 'berlin52.tsp'))
+    instances = MTSP._from_file(os.path.join('data', 'berlin52.tsp'),
+                        N = 10,
+                        M = 20,
+                        tau = 10,
+                        T = 1)
 
+    from struct2vec import DummyBrain, Struct2vec
+
+    for m in instances:
+        brain = DummyBrain(m)
+        s = Struct2vec(m)
+        s.layer_A1()
+
+        actions = brain.initial_assignment()
+
+        cost = 0
+        pprint(actions)
+
+        while m.remaining_cities != []:
+            min_distance, next_robots = m.make_move(actions)
+            if m.remaining_cities == []:
+                break
+
+            cost += min_distance
+            expected_values = brain.q()
+
+            actions = []
+
+            for r in next_robots:
+                next_city = min(m.remaining_cities,
+                            key = lambda c:expected_values(m, (r, c)))
+                actions.append((r, next_city))
+
+        print(cost)
+
+        # optimizer.step()
+
+    # for m in instances:
+        # brain = Struct2vec(

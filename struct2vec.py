@@ -7,6 +7,13 @@ from pprint import pprint
 from math import exp
 from random import sample
 
+if torch.cuda.is_available():
+    dev = "cuda:0"
+else:
+    dev = "cpu"
+
+device = torch.device(dev)
+
 class Struct2vec(nn.Module):
     def __init__(self, mtsp_instance):
         self.mtsp_instance = mtsp_instance
@@ -16,18 +23,18 @@ class Struct2vec(nn.Module):
         M = self.config.M
         tau = self.config.tau
 
-        self.W1, self.W2 = torch.rand(1, N), torch.rand(N, 3)
+        self.W1, self.W2 = torch.rand(1, N).to(device), torch.rand(N, 3).to(device)
 
-        self.W3_A1, self.W3_A2 = torch.rand(M, M+1), torch.rand(M, M+1)
-        self.W4_A1, self.W4_A2 = torch.rand(M, 1), torch.rand(M, 1)
+        self.W3_A1, self.W3_A2 = torch.rand(M, M+1).to(device), torch.rand(M, M+1).to(device)
+        self.W4_A1, self.W4_A2 = torch.rand(M, 1).to(device), torch.rand(M, 1).to(device)
 
-        self.W3_B = torch.rand(M, M)
-        self.W4_B = torch.rand(M, 2*M)
+        self.W3_B = torch.rand(M, M).to(device)
+        self.W4_B = torch.rand(M, 2*M).to(device)
 
-        self.W5 = torch.rand(1, M) # W8
-        self.W6 = torch.rand(1, M) # W9
+        self.W5 = torch.rand(1, M).to(device) # W8
+        self.W6 = torch.rand(1, M).to(device) # W9
 
-        self.W7 = torch.rand(1, M) # W10
+        self.W7 = torch.rand(1, M).to(device) # W10
 
     def layer_A1(self):
         G = defaultdict(lambda :{})
@@ -46,7 +53,7 @@ class Struct2vec(nn.Module):
                 xv_dist = graph[depot][v] / 1000
                 xu_dist = graph[depot][u] / 1000
 
-                a = torch.FloatTensor([vu_dist, xv_dist, xu_dist])
+                a = torch.FloatTensor([vu_dist, xv_dist, xu_dist]).to(device)
                 G[v][u] = torch.matmul(self.W1, F.relu(torch.matmul(self.W2, a)))
                 # print(G[v][u])
 
@@ -57,7 +64,7 @@ class Struct2vec(nn.Module):
         next_mu = {}
 
         for v in mtsp_instance.remaining_cities:
-            mu[v] = torch.rand(M, 1)
+            mu[v] = torch.rand(M, 1).to(device)
             next_mu[v] = None
 
         dist_from_robot = mtsp_instance.distance_from_robot()
@@ -79,8 +86,7 @@ class Struct2vec(nn.Module):
                 a = torch.matmul(self.W3_A1, l)
                 next_mu[v] = F.relu(torch.matmul(self.W3_A1, l) \
                     + torch.matmul(self.W4_A1,
-                        torch.FloatTensor([[dist_from_robot[v]]])))
-
+                        torch.FloatTensor([[dist_from_robot[v]]]).to(device)))
 
             mu = next_mu
 
@@ -103,7 +109,7 @@ class Struct2vec(nn.Module):
                 xv_dist = graph[depot][v]
                 xu_dist = graph[depot][u]
 
-                a = torch.FloatTensor([vu_dist, xv_dist, xu_dist])
+                a = torch.FloatTensor([vu_dist, xv_dist, xu_dist]).to(device)
                 G[v][u] = torch.matmul(self.W1, F.relu(torch.matmul(self.W2, a)))
                 # print(G[v][u])
 
@@ -114,7 +120,7 @@ class Struct2vec(nn.Module):
         next_mu = {}
 
         for v in mtsp_instance.remaining_cities:
-            mu[v] = torch.rand(M, 1)
+            mu[v] = torch.rand(M, 1).to(device)
             next_mu[v] = None
 
         dist_from_depot = mtsp_instance.distance_from_depot()
@@ -134,7 +140,7 @@ class Struct2vec(nn.Module):
 
                 next_mu[v] = F.relu(torch.matmul(self.W3_A2, l) \
                     + torch.matmul(self.W4_A2,
-                        torch.FloatTensor([[dist_from_depot[v]]])))
+                        torch.FloatTensor([[dist_from_depot[v]]]).to(device)))
 
             mu = next_mu
 
@@ -168,7 +174,7 @@ class Struct2vec(nn.Module):
                 xv_dist = graph[depot][v] / 1000
                 xu_dist = graph[depot][u] / 1000
 
-                a = torch.FloatTensor([vu_dist, xv_dist, xu_dist])
+                a = torch.FloatTensor([vu_dist, xv_dist, xu_dist]).to(device)
                 G[v][u] = torch.matmul(self.W1, F.relu(torch.matmul(self.W2, a)))
                 # print(G[v][u])
 

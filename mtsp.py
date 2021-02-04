@@ -82,7 +82,7 @@ class MTSP(Environment):
         for c in cities:
             V.append(c.city_id)
             for d in cities:
-                E.append(Edge(c.city_id, d.city_id, c.loc - d.loc))
+                E.append(Edge(c.city_id, d.city_id, (c.loc - d.loc) / 1000))
 
         self.graph = Graph(V, E)
         self.depot = depot
@@ -102,16 +102,8 @@ class MTSP(Environment):
             dists = []
             for r in self.robots:
                 if r.assigned_city is not None:
-                    dist.append(self.graph[r.assigned_city][v] + r.remaining_distance)
+                    dists.append(self.graph[r.assigned_city][v] + r.remaining_distance)
                 else:
-                    # if len(r.location_history) == 1: # in the depot
-                        # dists.append(self.graph[self.depot][v])
-                    # else: # when there are
-                        # tmp_dist = []
-                        # for r in self.robots:
-                            # if r.assigned_city == v:
-                                # tmp_dist.append(r.remaining_cities)
-                        # dists.append(min(tmp_dist))
                     dists.append(0)
             res[v] = min(dists)
 
@@ -168,6 +160,8 @@ class MTSP(Environment):
             if r.remaining_distance == 0:
                 next_robots.append(r)
                 r.is_available = True
+                r.assigned_city = None
+                r.remaining_distance = -1
 
         return min_distance, next_robots
 
@@ -198,43 +192,80 @@ if __name__ == '__main__':
                         T = 1)
 
     from struct2vec import DummyBrain, Struct2vec
-
-    for m in instances:
+    DEBUG = False
+    for m in instances[1:2]:
+        from time import time
+        begin = time()
         brain = DummyBrain(m)
         s = Struct2vec(m)
-        s.forward()
+        t = Struct2vec(m)
 
         actions = brain.initial_assignment()
-        # s.initialize()
+        actions = s.auction()
 
         cost = 0
-        pprint(actions)
+        pprint([(r.robot_id, c) for r, c in actions])
 
         cost_per_robot = [0 for v in m.robots]
+        trip_per_robot = [[] for v in m.robots]
 
         while m.remaining_cities != []:
-            # for r, dest in actions:
-                # print(f'{r.robot_id} to {dest}')
             min_distance, next_robots = m.make_move(actions)
 
             cost_per_robot[next_robots[0].robot_id] += min_distance
-
-            # print(f'epoch took {min_distance} time, {len(next_robots)}')
+            trip_per_robot[next_robots[0].robot_id].append([next_robots[0].location_history[-1]])
+            if DEBUG:
+                print('===============')
+                print(f'epoch took {min_distance} time')
+                print(f'remaining cities : {m.remaining_cities}')
 
             if m.remaining_cities == []:
+                r = next_robots[0]
+                next_city = r.location_history[-1]
+                print(f'{r.robot_id} : {r.location_history[-1]} --> {next_city}')
+                trip_per_robot[next_robots[0].robot_id][-1].append(next_city)
                 break
 
             cost += min_distance
-            expected_values = brain.q()
+            # expected_values = brain.q()
+            expected_values = s.Q
+            expected_noise_values = t.Q
 
             actions = []
 
             for r in next_robots:
+                assert r.assigned_city is None
+                vals = []
+                for c in m.remaining_cities:
+                    qval = brain.Q(m, (r,c))
+                    s2v_q = s.Q(m, (r,c))
+                    s2v_q_target = t.Q(m, (r,c))
+                    vals.append(((r,c), qval))
+                    if DEBUG:
+                        print(f'action : {r.robot_id} to {c}')
+                        print(f'exp : {qval} ')
+                        print(f's2v : {s2v_q}')
+                        print(f's2v_target : {s2v_q_target}')
                 next_city = min(m.remaining_cities,
-                            key = lambda c:expected_values(m, (r, c)))
+                            key = lambda c:s.Q(m, (r, c)))
+                print(f'{r.robot_id} : {r.location_history[-1]} --> {next_city}')
+                trip_per_robot[next_robots[0].robot_id][-1].append(next_city)
+
                 actions.append((r, next_city))
-        print(max(cost_per_robot))
-        print(cost)
+        cost_per_robot = []
+        print('============')
+        for r_idx, trips in enumerate(trip_per_robot):
+            print(r_idx)
+            print(trips)
+            for src, dest in trips:
+                print(f'{src} --> {dest}, {m.graph[src][dest]}')
+            print(sum([m.graph[s][d] for s, d in trips]))
+            cost_per_robot.append(sum([m.graph[s][d] for s, d in trips]))
+        print('============')
+        print(max(cost_per_robot) * 1000)
+        end = time()
+        print(end - begin)
+        # print(cost)
 
         # optimizer.step()
 

@@ -27,7 +27,7 @@ class Struct2vec(nn.Module):
         self.W5 = torch.rand(1, M) # W8
         self.W6 = torch.rand(1, M) # W9
 
-        self.W7 = torch.rand(1, 2*M) # W10
+        self.W7 = torch.rand(1, M) # W10
 
     def layer_A1(self):
         G = defaultdict(lambda :{})
@@ -131,7 +131,7 @@ class Struct2vec(nn.Module):
 
                 next_mu[v] = F.relu(torch.matmul(self.W3_A2, l) \
                     + torch.matmul(self.W4_A2,
-                        torch.FloatTensor([dist_from_robot[v]])))
+                        torch.FloatTensor([dist_from_depot[v]])))
 
             mu = next_mu
 
@@ -144,9 +144,9 @@ class Struct2vec(nn.Module):
 
         layer_B_input = {}
 
-        for v in graph.V:
-            a = layer_A1[v]
-            b = layer_A2[v]
+        for v in self.mtsp_instance.remaining_cities:
+            a = A1[v]
+            b = A2[v]
             layer_B_input[v] = torch.cat((a, b))
 
         G = defaultdict(lambda :{})
@@ -179,8 +179,6 @@ class Struct2vec(nn.Module):
             mu[v] = torch.rand(M, 1)
             next_mu[v] = None
 
-        dist_from_robot = mtsp_instance.distance_from_robot()
-
         # main loop for struct2vec
         for t in range(T):
             for v in mtsp_instance.remaining_cities:
@@ -188,22 +186,18 @@ class Struct2vec(nn.Module):
                 Z = sum([exp(G[u][v]/tau) for u in mtsp_instance.remaining_cities if v != u])
                 p = [exp(G[u][v]/tau)/Z for u in mtsp_instance.remaining_cities if v != u] # softmax of G given tau
 
-                l_not_weighted = [torch.cat(\
-                    (graph[u][v] * F.relu(torch.matmul(self.W5, mu[v])), mu[u])) \
-                        for u in mtsp_instance.remaining_cities if u != v]
+                l_not_weighted = [mu[u] for u in mtsp_instance.remaining_cities if u != v]
 
                 l = sum([p_uv * l_uv for p_uv, l_uv in zip(p, l_not_weighted)])
 
-                next_mu[v] = F.relu(torch.matmul(self.W3_A1, l) \
-                    + torch.matmul(self.W4_A1,
-                        torch.FloatTensor([dist_from_robot[v]])))
+                next_mu[v] = F.relu(\
+                    torch.matmul(self.W3_B, l) \
+                    + torch.matmul(self.W4_B, layer_B_input[v]))
 
             mu = next_mu
 
-        return mu
+        return F.relu(torch.matmul(self.W7, sum([mu[v] for v in mtsp_instance.remaining_cities])))
 
-
-        return layer_B
 
     def auction(self):
         pass

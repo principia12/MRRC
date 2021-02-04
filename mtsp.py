@@ -202,15 +202,25 @@ if __name__ == '__main__':
     for m in instances:
         brain = DummyBrain(m)
         s = Struct2vec(m)
-        s.layer_A1()
+        s.forward()
 
         actions = brain.initial_assignment()
+        # s.initialize()
 
         cost = 0
         pprint(actions)
 
+        cost_per_robot = [0 for v in m.robots]
+
         while m.remaining_cities != []:
+            # for r, dest in actions:
+                # print(f'{r.robot_id} to {dest}')
             min_distance, next_robots = m.make_move(actions)
+
+            cost_per_robot[next_robots[0].robot_id] += min_distance
+
+            # print(f'epoch took {min_distance} time, {len(next_robots)}')
+
             if m.remaining_cities == []:
                 break
 
@@ -223,7 +233,7 @@ if __name__ == '__main__':
                 next_city = min(m.remaining_cities,
                             key = lambda c:expected_values(m, (r, c)))
                 actions.append((r, next_city))
-
+        print(max(cost_per_robot))
         print(cost)
 
         # optimizer.step()
